@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PM Monitor — INAIL & Sapienza</title>
+<meta name="description" content="Private particulate-matter monitor for PMS5003 sensor boxes">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#0e1424">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="styles.css">
+<script src="vendor/chart.umd.js" defer></script>
+<script type="module" src="js/app.js"></script>
+</head>
+<body>
+<div id="boot" class="center-screen"><div class="spinner"></div></div>
+
+<!-- ============ setup needed ============ -->
+<section id="scr-setup" class="center-screen" hidden>
+  <div class="card narrow">
+    <img src="icons/icon-192.png" class="logo" alt="">
+    <h1>Almost ready</h1>
+    <p>Firebase is not configured yet. Open <code>config.js</code> and paste your Firebase web config
+       (see <b>SETUP_GUIDE.md</b>, step 2).</p>
+  </div>
+</section>
+
+<!-- ============ sign in ============ -->
+<section id="scr-login" class="center-screen" hidden>
+  <div class="card narrow">
+    <img src="icons/icon-192.png" class="logo" alt="">
+    <h1>PM Monitor</h1>
+    <p class="muted">INAIL &amp; Sapienza — particulate-matter sensor project</p>
+    <button id="btn-signin" class="btn primary big"><span class="g">G</span> Sign in with Google</button>
+    <p class="small muted">This is a private app. After signing in, your request is sent to the owner,
+      who must approve it before you can use the sensors.</p>
+    <p id="login-err" class="err small"></p>
+  </div>
+</section>
+
+<!-- ============ waiting / revoked ============ -->
+<section id="scr-wait" class="center-screen" hidden>
+  <div class="card narrow">
+    <img src="icons/icon-192.png" class="logo" alt="">
+    <h1 id="wait-title">Request sent</h1>
+    <p id="wait-text" class="muted">The owner has to approve your account. This page opens automatically when you are approved.</p>
+    <p class="small">Signed in as <b class="who-email"></b></p>
+    <label class="small muted" for="wait-msg">Message to the owner (optional)</label>
+    <textarea id="wait-msg" rows="3" maxlength="500" placeholder="Who are you and why do you need access?"></textarea>
+    <div class="row">
+      <button id="btn-wait-send" class="btn">Send message</button>
+      <button class="btn ghost btn-signout">Sign out</button>
+    </div>
+    <p id="wait-note" class="small ok"></p>
+  </div>
+</section>
+
+<!-- ============ main app ============ -->
+<section id="scr-main" hidden>
+  <header class="topbar">
+    <div class="brand"><img src="icons/icon-192.png" alt=""><span>PM Monitor</span></div>
+    <nav class="tabs" role="tablist">
+      <button class="tab active" data-tab="live">Live</button>
+      <button class="tab" data-tab="sessions">Sessions</button>
+      <button class="tab" data-tab="access" id="tab-access" hidden>Access <span id="badge-pending" class="badge" hidden>0</span></button>
+    </nav>
+    <div class="user">
+      <button id="btn-install" class="btn ghost small-btn" hidden>⤓ Install app</button>
+      <span class="who-name small"></span>
+      <button class="btn ghost small-btn btn-signout">Sign out</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- ---------- LIVE ---------- -->
+    <div id="view-live" class="view">
+      <div class="toolbar">
+        <button id="btn-ble" class="btn primary">📶 Connect Bluetooth</button>
+        <button id="btn-usb" class="btn primary">🔌 Connect USB cable</button>
+        <label class="chk small"><input type="checkbox" id="chk-showall"> show all Bluetooth devices</label>
+        <span class="spacer"></span>
+        <button id="btn-rec" class="btn rec" disabled>● Record</button>
+        <span id="rec-time" class="mono small"></span>
+        <button id="btn-csv" class="btn ghost" disabled>⬇ CSV (screen)</button>
+      </div>
+      <div id="support-msg" class="notice" hidden></div>
+      <div id="offline-msg" class="notice" hidden>You are offline. Live data and recording still work; recordings upload when you are back online.</div>
+
+      <div id="devices" class="devices">
+        <div class="empty muted">No box connected. Switch a box on and press <b>Connect Bluetooth</b>, or plug it in and press <b>Connect USB cable</b>.</div>
+      </div>
+
+      <div class="charts">
+        <div class="panel"><h3>Mass concentration (µg/m³) — <span class="sel-name muted">no box</span></h3><div class="chart-wrap"><canvas id="ch-mass"></canvas></div></div>
+        <div class="panel"><h3>Particle count (#/0.1 L) — <span class="sel-name muted">no box</span></h3><div class="chart-wrap"><canvas id="ch-count"></canvas></div></div>
+      </div>
+
+      <details class="panel" id="log-panel">
+        <summary>Connection log <span id="log-count" class="muted small"></span></summary>
+        <pre id="log"></pre>
+        <button id="btn-clearlog" class="btn ghost small-btn">Clear</button>
+      </details>
+    </div>
+
+    <!-- ---------- SESSIONS ---------- -->
+    <div id="view-sessions" class="view" hidden>
+      <div class="toolbar">
+        <h2>Recorded sessions</h2>
+        <select id="sess-owner" hidden></select>
+        <span class="spacer"></span>
+        <button id="btn-sess-refresh" class="btn ghost">↻ Refresh</button>
+      </div>
+      <div class="panel table-wrap">
+        <table class="tbl">
+          <thead><tr><th>Start</th><th>Box</th><th>Link</th><th>Duration</th><th>Readings</th><th>Mean PM2.5</th><th>Max PM2.5</th><th></th></tr></thead>
+          <tbody id="sess-body"><tr><td colspan="8" class="muted">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ---------- ACCESS (owner only) ---------- -->
+    <div id="view-access" class="view" hidden>
+      <div class="toolbar"><h2>Who can use this app</h2></div>
+      <p class="muted small">New people appear here after they sign in. <b>Approve</b> gives access, <b>Revoke</b> removes it immediately
+        (their app locks and the database refuses their data), <b>Delete</b> removes the entry completely.</p>
+      <div class="panel table-wrap">
+        <table class="tbl">
+          <thead><tr><th>Person</th><th>Status</th><th>Requested</th><th>Last seen</th><th>Message</th><th></th></tr></thead>
+          <tbody id="users-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</section>
+
+<div id="toast" class="toast" hidden></div>
+</body>
+</html>
