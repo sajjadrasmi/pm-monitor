@@ -107,3 +107,65 @@ select{background:var(--panel2);color:var(--txt);border:1px solid var(--line);bo
   main{padding:10px} .topbar{gap:8px} .user .who-name{display:none}
   .toolbar .btn{flex:1 1 auto}
 }
+
+/* ---------- v2.1 additions ---------- */
+.nowrap{white-space:nowrap}
+.pad{padding:12px 14px 0}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.chip{display:inline-block;font-size:12px;background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:2px 9px;color:var(--txt)}
+.chip.warnchip{border-color:var(--warn);color:var(--warn)}
+.mini{margin-top:8px}
+.vals .hot{background:#4a1822;outline:1px solid var(--err)}
+.dev.alarm{border-color:var(--err);box-shadow:0 0 0 1px var(--err) inset}
+.alarm-banner{position:sticky;top:57px;z-index:4;display:flex;align-items:center;gap:12px;justify-content:space-between;
+  background:#5a1220;color:#fff;border-bottom:1px solid var(--err);padding:10px 16px;font-weight:600;animation:pulse 1.6s infinite}
+.marker-bar .quick{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.marker-form{display:flex;gap:8px}
+.marker-form input,.settings input[type=number],.settings input[type=text],.dlg input,.dlg textarea{
+  flex:1;background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:8px;font:inherit;width:100%}
+.marker-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.settings{max-width:720px}
+.settings h3{margin-top:18px}
+.settings label{display:block;margin:8px 0;font-size:14px}
+.settings .chk{display:flex;color:var(--txt)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.dlg{background:var(--panel);color:var(--txt);border:1px solid var(--line);border-radius:16px;padding:22px;width:min(460px,92vw)}
+.dlg::backdrop{background:rgba(0,0,0,.6)}
+.dlg label{display:block;margin:10px 0;font-size:14px}
+.dlg .chk{display:flex}
+.row.right{justify-content:flex-end;margin-top:14px}
+
+/* report (screen) */
+.report-view{position:fixed;inset:0;z-index:30;overflow:auto;background:#eef1f6;color:#1b2333;padding:20px}
+.report{max-width:1000px;margin:0 auto;background:#fff;border-radius:12px;padding:28px 32px;box-shadow:0 4px 30px rgba(0,0,0,.15)}
+.report h1{font-size:24px;margin:0;color:#0e1424}
+.report h2{font-size:16px;margin:22px 0 8px;color:#0e1424;border-bottom:2px solid #e3e8f0;padding-bottom:4px}
+.report .muted{color:#6b778c}
+.report a{color:#1f6fd1}
+.rep-head{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start;margin-bottom:14px}
+.rep-actions{display:flex;gap:6px;flex-wrap:wrap}
+.report .btn{background:#f2f4f8;color:#1b2333;border-color:#d5dbe6}
+.report .btn.primary{background:#1f6fd1;color:#fff;border-color:#1f6fd1}
+.kv{width:100%;border-collapse:collapse;font-size:14px}
+.kv td{padding:6px 8px;border-bottom:1px solid #eef1f6}
+.kv td:nth-child(odd){color:#6b778c;width:16%}
+.report .tbl th,.report .tbl td{border-bottom:1px solid #e8ecf3;color:#1b2333}
+.report .tbl th{color:#6b778c}
+.rep-tbl td,.rep-tbl th{padding:7px 9px;font-size:13px}
+.rep-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+.rep-chart{position:relative;height:250px;margin-bottom:10px}
+@media(max-width:700px){.rep-grid,.grid2{grid-template-columns:1fr}.report{padding:16px}}
+
+/* print: only the report, white, A4 */
+@media print{
+  @page{size:A4;margin:12mm}
+  body.printing > *:not(#report-view){display:none!important}
+  html,body,body.printing{background:#fff!important;color:#1b2333}
+  body.printing .report-view{position:static;background:#fff;padding:0;overflow:visible}
+  body.printing .report{box-shadow:none;padding:0;max-width:none}
+  .no-print{display:none!important}
+  .rep-chart{height:210px;break-inside:avoid}
+  .report h2{break-after:avoid}
+  table{break-inside:avoid}
+}
+.tbl th.no-upper{text-transform:none}

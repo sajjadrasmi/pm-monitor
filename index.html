@@ -65,6 +65,7 @@
       <button class="tab active" data-tab="live">Live</button>
       <button class="tab" data-tab="sessions">Sessions</button>
       <button class="tab" data-tab="access" id="tab-access" hidden>Access <span id="badge-pending" class="badge" hidden>0</span></button>
+      <button class="tab" data-tab="settings">Settings</button>
     </nav>
     <div class="user">
       <button id="btn-install" class="btn ghost small-btn" hidden>⤓ Install app</button>
@@ -73,6 +74,7 @@
     </div>
   </header>
 
+  <div id="alarm-banner" class="alarm-banner" hidden><span id="alarm-text"></span><button id="btn-mute" class="btn small-btn">🔕 Mute</button></div>
   <main>
     <!-- ---------- LIVE ---------- -->
     <div id="view-live" class="view">
@@ -88,6 +90,13 @@
       <div id="support-msg" class="notice" hidden></div>
       <div id="offline-msg" class="notice" hidden>You are offline. Live data and recording still work; recordings upload when you are back online.</div>
 
+      <div id="marker-bar" class="panel marker-bar" hidden>
+        <div class="small muted">Event markers (saved in the recording at this moment):</div>
+        <div id="quick-markers" class="quick"></div>
+        <form id="marker-form" class="marker-form"><input id="marker-text" maxlength="80" placeholder="Custom event, e.g. 'grinding started'"><button class="btn">+ Add</button></form>
+        <div id="marker-list" class="marker-list"></div>
+      </div>
+
       <div id="devices" class="devices">
         <div class="empty muted">No box connected. Switch a box on and press <b>Connect Bluetooth</b>, or plug it in and press <b>Connect USB cable</b>.</div>
       </div>
@@ -95,6 +104,16 @@
       <div class="charts">
         <div class="panel"><h3>Mass concentration (µg/m³) — <span class="sel-name muted">no box</span></h3><div class="chart-wrap"><canvas id="ch-mass"></canvas></div></div>
         <div class="panel"><h3>Particle count (#/0.1 L) — <span class="sel-name muted">no box</span></h3><div class="chart-wrap"><canvas id="ch-count"></canvas></div></div>
+      </div>
+
+      <div class="panel" id="cmp-panel" hidden><h3>PM2.5 — all boxes (µg/m³)</h3><div class="chart-wrap"><canvas id="ch-cmp"></canvas></div></div>
+
+      <div class="panel table-wrap">
+        <h3 class="pad">Exposure statistics — <span class="sel-name muted">no box</span> <span id="stats-dur" class="small muted"></span></h3>
+        <table class="tbl">
+          <thead><tr><th class="no-upper">µg/m³</th><th>TW mean</th><th>15-min now</th><th>Max</th><th>P95</th><th>Peak 15-min</th><th>TWA-8h so far</th><th>Above limit</th></tr></thead>
+          <tbody id="stats-body"></tbody>
+        </table>
       </div>
 
       <details class="panel" id="log-panel">
@@ -114,8 +133,8 @@
       </div>
       <div class="panel table-wrap">
         <table class="tbl">
-          <thead><tr><th>Start</th><th>Box</th><th>Link</th><th>Duration</th><th>Readings</th><th>Mean PM2.5</th><th>Max PM2.5</th><th></th></tr></thead>
-          <tbody id="sess-body"><tr><td colspan="8" class="muted">Loading…</td></tr></tbody>
+          <thead><tr><th>Start</th><th>Box</th><th>Task / site</th><th>Worker</th><th>Duration</th><th>Readings</th><th>Mean PM2.5</th><th>Max PM2.5</th><th></th></tr></thead>
+          <tbody id="sess-body"><tr><td colspan="9" class="muted">Loading…</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -132,8 +151,48 @@
         </table>
       </div>
     </div>
+    <!-- ---------- SETTINGS ---------- -->
+    <div id="view-settings" class="view" hidden>
+      <div class="toolbar"><h2>Settings</h2><span class="spacer"></span><span class="small muted">PM Monitor <span id="app-version"></span></span></div>
+      <form id="settings-form" class="panel settings">
+        <h3>Alarm thresholds (µg/m³)</h3>
+        <p class="small muted">Used for alarms, "time above limit" and reports. They are your working thresholds, not legal limits
+          (reference: EU daily limit PM10 = 50; WHO 2021 24-h guideline PM2.5 = 15, PM10 = 45).</p>
+        <div class="grid2">
+          <label>PM2.5 alarm <input id="set-lim25" type="number" min="1" step="1"></label>
+          <label>PM10 alarm <input id="set-lim10" type="number" min="1" step="1"></label>
+        </div>
+        <label class="chk"><input type="checkbox" id="set-alarm"> Alarm when a box is above the threshold for 3 readings in a row</label>
+        <label class="chk"><input type="checkbox" id="set-sound"> Alarm sound (and vibration on phones)</label>
+        <h3>Recording</h3>
+        <label class="chk"><input type="checkbox" id="set-gps"> Record GPS position of this phone/PC by default</label>
+        <label>Quick event markers (comma-separated)<input id="set-quick" type="text"></label>
+        <h3>Export</h3>
+        <label class="chk"><input type="checkbox" id="set-excel"> CSV for Italian/European Excel (semicolon ; and decimal comma)</label>
+        <div><button class="btn primary">Save settings</button></div>
+        <h3>Phones</h3>
+        <p class="small">Android: Chrome → ⋮ → <b>Install app</b>. iPhone/iPad: install <b>Bluefy – Web BLE Browser</b> and open this address in it (Bluetooth only).</p>
+      </form>
+    </div>
   </main>
 </section>
+
+<!-- ============ session dialog ============ -->
+<dialog id="dlg-session" class="dlg">
+  <form id="sess-form" method="dialog">
+    <h2>New recording</h2>
+    <p class="small muted">Boxes: <b id="s-boxes"></b></p>
+    <label>Worker / ID <input id="s-worker" maxlength="60" placeholder="e.g. W-012 or name"></label>
+    <label>Task / activity <input id="s-task" maxlength="80" placeholder="e.g. welding, sanding, office"></label>
+    <label>Site / location <input id="s-site" maxlength="80" placeholder="e.g. Lab 3, Workshop B"></label>
+    <label>Notes <textarea id="s-notes" rows="2" maxlength="500" placeholder="ventilation, PPE, weather…"></textarea></label>
+    <label class="chk"><input type="checkbox" id="s-gps"> Record GPS position (from this phone/PC)</label>
+    <div class="row right"><button type="button" id="sess-cancel" class="btn ghost">Cancel</button><button class="btn rec on-start">● Start recording</button></div>
+  </form>
+</dialog>
+
+<!-- ============ report ============ -->
+<section id="report-view" class="report-view" hidden><div id="report-body"></div></section>
 
 <div id="toast" class="toast" hidden></div>
 </body>

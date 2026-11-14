@@ -1,7 +1,7 @@
 // Offline support: app files are cached; updates are picked up on the next start.
-const CACHE = 'pm-monitor-v2.0.0';
+const CACHE = 'pm-monitor-v2.1.0';
 const FILES = ['./', 'index.html', 'styles.css', 'config.js', 'manifest.webmanifest',
-  'js/app.js', 'js/devices.js', 'js/parser.js', 'js/backend-firebase.js',
+  'js/app.js', 'js/devices.js', 'js/parser.js', 'js/stats.js', 'js/report.js', 'js/backend-firebase.js',
   'vendor/firebase.js', 'vendor/chart.umd.js', 'icons/icon-192.png', 'icons/icon-512.png'];
 
 self.addEventListener('install', e => {
