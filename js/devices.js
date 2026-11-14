@@ -53,6 +53,12 @@ export class DeviceManager extends EventTarget {
       if (dev.state !== 'connected') this._setState(dev, 'connected');
       this._emit('reading', { dev, r: m.r, t: dev.lastAt, legacy: m.type === 'legacy' });
       this._changed();
+    } else if (m.type === 'env') {
+      dev.env = { temp: m.t, rh: m.rh, at: Date.now() };
+      this._changed();
+    } else if (m.type === 'sys') {
+      dev.sys = { vbat: m.vbat, rssi: m.rssi, uptime: m.uptime, sht: m.sht, at: Date.now() };
+      this._changed();
     } else if (m.type === 'info') {
       if (m.box && m.box !== dev.name) {
         if (dev.transport === 'usb' || !dev.name || dev.name === 'Box') dev.name = m.box;
@@ -239,7 +245,12 @@ export class DeviceManager extends EventTarget {
       const v = x => Math.max(0, Math.round(x));
       const line = `AQ,${v(base * .7)},${v(base)},${v(base * 1.3)},${v(base * .7)},${v(base)},${v(base * 1.3)},` +
         `${v(base * 120)},${v(base * 35)},${v(base * 6)},${v(base * .8)},${v(base * .2)},${v(base * .05)}\n`;
-      this._handleText(dev, k === 1 ? `INFO,BOX,${name},FW,2.0\n` + line : line);
+      let extra = '';
+      if (k % 5 === 1) {
+        extra = `ENV,${(22 + 2 * Math.sin(k / 40)).toFixed(2)},${(48 + 10 * Math.sin(k / 25)).toFixed(1)}\n` +
+                `SYS,${3900 - k},${-55 - Math.round(Math.random() * 15)},${k},1\n`;
+      }
+      this._handleText(dev, (k === 1 ? `INFO,BOX,${name},FW,2.1\n` : '') + extra + line);
     }, 1000);
     return dev;
   }
