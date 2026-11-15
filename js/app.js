@@ -4,8 +4,9 @@ import { DeviceManager, HAS_BLE, HAS_SERIAL } from './devices.js';
 import { computeAQI, CSV_HEADER, rowToCsv, parseCsv, toExcelEU } from './parser.js';
 import { ExposureStats, fmt, fmtDuration } from './stats.js';
 import { renderReport } from './report.js';
+import { csvToXlsx } from './xlsx.js';
 
-const VERSION = '2.1.0';
+const VERSION = '2.2.0';
 
 // ---------------- helpers ----------------
 const $ = s => document.querySelector(s);
@@ -18,6 +19,10 @@ function download(name, text, type = 'text/csv') {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([type === 'text/csv' ? '﻿' + text : text], { type: type + ';charset=utf-8' }));
   a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+function downloadBlob(name, blob) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
 }
 const safeName = s => String(s || 'box').replace(/[^\w.-]+/g, '_');
 const stamp = d => (d || new Date()).toISOString().slice(0, 16).replace(/[:T]/g, '-');
@@ -553,9 +558,12 @@ let wakeLock = null;
 async function requestWakeLock() { try { if ('wakeLock' in navigator && !wakeLock) { wakeLock = await navigator.wakeLock.request('screen'); wakeLock.onrelease = () => { wakeLock = null; }; } } catch (_) {} }
 function releaseWakeLock() { try { wakeLock?.release(); } catch (_) {} wakeLock = null; }
 
-function exportCsv(base, csv) {
-  if (settings.excelEU) download(base + '_excel.csv', toExcelEU(csv));
-  else download(base + '.csv', csv);
+function exportCsv(base, csv, meta = {}) {
+  if (settings.excelEU) {        // real Excel workbook: numbers, date/time and charts work in every Excel language
+    try { downloadBlob(base + '.xlsx', csvToXlsx(csv, meta)); return; }
+    catch (e) { console.warn('xlsx', e); toast('Excel export failed, downloading CSV instead.'); }
+  }
+  download(base + '.csv', csv);  // plain CSV: comma separator, decimal point (MATLAB, Python, Origin)
 }
 
 // ================= sessions + reports =================
@@ -601,7 +609,7 @@ async function onSessionAction(e) {
     try {
       const body = await backend.getSessionCsvBody(uid, sid);
       const csv = CSV_HEADER + '\n' + body;
-      if (act === 'csv') exportCsv(base, csv);
+      if (act === 'csv') exportCsv(base, csv, s);
       else {
         currentReport = { s, csv, base };
         $('#report-view').hidden = false;
@@ -622,7 +630,7 @@ function onReportAction(e) {
   if (act === 'close') { $('#report-view').hidden = true; currentReport = null; }
   if (act === 'print') { document.body.classList.add('printing'); setTimeout(() => window.print(), 100); }
   if (act === 'csv') download(currentReport.base + '.csv', currentReport.csv);
-  if (act === 'xls') download(currentReport.base + '_excel.csv', toExcelEU(currentReport.csv));
+  if (act === 'xls') downloadBlob(currentReport.base + '.xlsx', csvToXlsx(currentReport.csv, currentReport.s));
 }
 
 // ================= settings =================

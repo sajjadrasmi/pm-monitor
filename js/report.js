@@ -49,7 +49,7 @@ export function renderReport(el, { meta, rows, limits, appVersion }) {
       <div class="rep-actions no-print">
         <button class="btn primary" data-act="print">🖨 Print / Save PDF</button>
         <button class="btn" data-act="csv">⬇ CSV</button>
-        <button class="btn" data-act="xls">⬇ Excel (IT)</button>
+        <button class="btn" data-act="xls">⬇ Excel (.xlsx)</button>
         <button class="btn ghost" data-act="close">✕ Close</button>
       </div>
     </div>
