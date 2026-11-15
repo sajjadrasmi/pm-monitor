@@ -6,7 +6,7 @@ import { ExposureStats, fmt, fmtDuration } from './stats.js';
 import { renderReport } from './report.js';
 import { csvToXlsx } from './xlsx.js';
 
-const VERSION = '2.2.0';
+const VERSION = '2.3.0';
 
 // ---------------- helpers ----------------
 const $ = s => document.querySelector(s);
@@ -32,7 +32,7 @@ const DEV_MODE = ['localhost', '127.0.0.1'].includes(location.hostname) && param
 const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
 // ---------------- settings (per browser) ----------------
-const DEFAULTS = { lim25: 25, lim10: 50, alarm: true, sound: true, excelEU: true, gps: false,
+const DEFAULTS = { lim25: 25, lim10: 50, alarm: true, sound: true, voice: true, voiceLang: 'en', voiceRep: 30, excelEU: true, gps: false,
   quick: 'Task start, Task end, Break, Machine ON, Machine OFF, Door/window open, Cleaning' };
 let settings = { ...DEFAULTS };
 try { Object.assign(settings, JSON.parse(localStorage.getItem('pm_settings') || '{}')); } catch (_) {}
@@ -147,7 +147,7 @@ function wireStaticUI() {
   $('#btn-rec').onclick = () => rec ? stopRecording() : openSessionDialog();
   $('#btn-csv').onclick = () => exportCsv(`PM_screen_${stamp()}`, CSV_HEADER + '\n' + screenRows.join('\n'));
   $('#btn-clearlog').onclick = () => { $('#log').innerHTML = ''; logN = 0; $('#log-count').textContent = ''; };
-  $('#btn-mute').onclick = () => { muted = !muted; $('#btn-mute').textContent = muted ? '🔔 Unmute' : '🔕 Mute'; };
+  $('#btn-mute').onclick = () => { muted = !muted; $('#btn-mute').textContent = muted ? '🔔 Unmute' : '🔕 Mute'; if (muted) try { speechSynthesis.cancel(); } catch (_) {} };
 
   // session dialog
   $('#sess-form').onsubmit = e => { e.preventDefault(); startRecording(readSessionForm()); $('#dlg-session').close(); };
@@ -184,6 +184,12 @@ function wireStaticUI() {
 
   setInterval(() => { if (!appEntered) return; if (devices.list().length) renderDevices(); updateRecTime(); tickCompare(); renderStatsPanel(); }, 1000);
   setInterval(() => { if (!muted && settings.sound && [...alarms.values()].some(a => a.active)) beep(); }, 8000);
+  setInterval(voiceReminder, 5000);
+  $('#btn-voicetest').onclick = () => { readSettingsForm(); speakNow(alarmPhrase([{ k: 'PM2.5', v: 42, lim: settings.lim25 }], null)); };
+  // phones only allow speech after the user has touched the page once: unlock it on the first tap
+  const unlock = () => { try { const u = new SpeechSynthesisUtterance(''); u.volume = 0; speechSynthesis.speak(u); } catch (_) {}
+    document.removeEventListener('pointerdown', unlock, true); };
+  document.addEventListener('pointerdown', unlock, true);
 }
 
 function switchTab(name) {
@@ -398,21 +404,22 @@ function renderStatsPanel() {
 // ================= alarms =================
 function checkAlarm(dev, r) {
   if (!settings.alarm) return;
-  const a = alarms.get(dev.id) || { count: 0, active: false, what: '' };
-  const over = [];
-  if (r.pm25 != null && r.pm25 > settings.lim25) over.push(`PM2.5 ${r.pm25} > ${settings.lim25}`);
-  if (r.pm10 != null && r.pm10 > settings.lim10) over.push(`PM10 ${r.pm10} > ${settings.lim10}`);
+  const a = alarms.get(dev.id) || { count: 0, active: false, what: '', items: [] };
+  const over = [], items = [];
+  if (r.pm25 != null && r.pm25 > settings.lim25) { over.push(`PM2.5 ${r.pm25} > ${settings.lim25}`); items.push({ k: 'PM2.5', v: r.pm25, lim: settings.lim25 }); }
+  if (r.pm10 != null && r.pm10 > settings.lim10) { over.push(`PM10 ${r.pm10} > ${settings.lim10}`); items.push({ k: 'PM10', v: r.pm10, lim: settings.lim10 }); }
   if (over.length) {
-    a.count++; a.what = over.join(', ');
+    a.count++; a.what = over.join(', '); a.items = items;
     if (a.count >= 3 && !a.active) {                       // 3 consecutive readings: avoids alarms on single spikes
       a.active = true;
       logLine(dev, 'err', 'ALARM: ' + a.what + ' µg/m³');
       if (!muted && settings.sound) beep();
+      speakAlarm(dev, a, true);
       try { navigator.vibrate?.([300, 150, 300]); } catch (_) {}
       if (rec) addMarker('ALARM ' + a.what, dev.id);
     }
   } else {
-    if (a.active) logLine(dev, 'ok', 'Back below the limits.');
+    if (a.active) { logLine(dev, 'ok', 'Back below the limits.'); speakNow(backPhrase(dev)); }
     a.count = 0; a.active = false; a.what = '';
   }
   alarms.set(dev.id, a);
@@ -423,6 +430,46 @@ function updateAlarmBanner() {
   $('#alarm-banner').hidden = !act.length;
   if (act.length) $('#alarm-text').textContent = '⚠ ' + act.map(d => `${d.name}: ${alarms.get(d.id).what} µg/m³`).join(' · ');
 }
+// ---------- voice alarm (speech synthesis, works offline in Chrome/Edge/Android/Bluefy) ----------
+const VOICE_TXT = {
+  en: { warn: 'Warning!', still: 'Still above the limit.', is: 'is', unit: 'micrograms per cubic metre', above: 'above the limit of',
+        and: 'and', back: 'Air quality back below the limits', box: 'Box', move: 'Please ventilate or leave the area.' },
+  it: { warn: 'Attenzione!', still: 'Ancora oltre il limite.', is: 'è', unit: 'microgrammi per metro cubo', above: 'oltre il limite di',
+        and: 'e', back: 'Qualità dell\'aria di nuovo sotto i limiti', box: 'Box', move: 'Aerare il locale o allontanarsi.' },
+};
+const sayName = n => String(n || '').replace(/^PM-BOX-/i, '').replace(/[-_]+/g, ' ').split('').join(' ').replace(/\s+/g, ' ');
+function alarmPhrase(items, dev, again = false) {
+  const T = VOICE_TXT[settings.voiceLang] || VOICE_TXT.en;
+  const multi = devices.list().length > 1 && dev;
+  const pm = k => (settings.voiceLang === 'it' ? k.replace('2.5', ' 2 virgola 5') : k.replace('2.5', ' 2.5')).replace('PM', 'P M ');
+  const parts = items.map(x => `${pm(x.k)} ${T.is} ${Math.round(x.v)} ${T.unit}, ${T.above} ${x.lim}`);
+  return `${again ? T.still : T.warn} ${multi ? T.box + ' ' + sayName(dev.name) + '. ' : ''}${parts.join(` ${T.and} `)}. ${again ? '' : T.move}`;
+}
+function backPhrase(dev) {
+  const T = VOICE_TXT[settings.voiceLang] || VOICE_TXT.en;
+  return `${T.back}${devices.list().length > 1 ? ', ' + T.box + ' ' + sayName(dev.name) : ''}.`;
+}
+function speakNow(text) {
+  if (muted || !settings.voice || !('speechSynthesis' in window) || !text) return;
+  try {
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = settings.voiceLang === 'it' ? 'it-IT' : 'en-GB';
+    const v = speechSynthesis.getVoices().find(x => x.lang && x.lang.toLowerCase().startsWith(settings.voiceLang));
+    if (v) u.voice = v;
+    u.rate = 0.95; u.pitch = 1; u.volume = 1;
+    speechSynthesis.cancel(); speechSynthesis.speak(u);
+  } catch (_) {}
+}
+function speakAlarm(dev, a, first) { a.spokenAt = Date.now(); speakNow(alarmPhrase(a.items, dev, !first)); }
+function voiceReminder() {
+  if (!settings.voice || muted || !+settings.voiceRep) return;
+  for (const d of devices.list()) {
+    const a = alarms.get(d.id);
+    if (a?.active && Date.now() - (a.spokenAt || 0) >= settings.voiceRep * 1000) { speakAlarm(d, a, false); break; }
+  }
+}
+try { speechSynthesis.onvoiceschanged = () => {}; speechSynthesis.getVoices(); } catch (_) {}
+
 let audioCtx = null;
 function beep() {
   try {
@@ -637,6 +684,7 @@ function onReportAction(e) {
 function fillSettingsForm() {
   $('#set-lim25').value = settings.lim25; $('#set-lim10').value = settings.lim10;
   $('#set-alarm').checked = settings.alarm; $('#set-sound').checked = settings.sound;
+  $('#set-voice').checked = settings.voice; $('#set-voicelang').value = settings.voiceLang; $('#set-voicerep').value = String(settings.voiceRep);
   $('#set-excel').checked = settings.excelEU; $('#set-gps').checked = settings.gps;
   $('#set-quick').value = settings.quick;
   $('#app-version').textContent = VERSION;
@@ -646,6 +694,7 @@ function readSettingsForm() {
   settings.lim25 = n($('#set-lim25').value) ?? DEFAULTS.lim25;
   settings.lim10 = n($('#set-lim10').value) ?? DEFAULTS.lim10;
   settings.alarm = $('#set-alarm').checked; settings.sound = $('#set-sound').checked;
+  settings.voice = $('#set-voice').checked; settings.voiceLang = $('#set-voicelang').value; settings.voiceRep = +$('#set-voicerep').value;
   settings.excelEU = $('#set-excel').checked; settings.gps = $('#set-gps').checked;
   settings.quick = $('#set-quick').value;
   saveSettings(); renderQuickMarkers();
