@@ -163,7 +163,13 @@
           <label>PM10 alarm <input id="set-lim10" type="number" min="1" step="1"></label>
         </div>
         <label class="chk"><input type="checkbox" id="set-alarm"> Alarm when a box is above the threshold for 3 readings in a row</label>
-        <label class="chk"><input type="checkbox" id="set-sound"> Alarm sound (and vibration on phones)</label>
+        <label class="chk"><input type="checkbox" id="set-sound"> Alarm beep (and vibration on phones)</label>
+        <label class="chk"><input type="checkbox" id="set-voice"> 🗣 Voice alarm: the app speaks the warning and the measured value</label>
+        <div class="row-inline">
+          <label>Voice language <select id="set-voicelang"><option value="en">English</option><option value="it">Italiano</option></select></label>
+          <label>Repeat every <select id="set-voicerep"><option value="30">30 s</option><option value="60">1 min</option><option value="120">2 min</option><option value="0">never</option></select></label>
+          <button type="button" id="btn-voicetest" class="btn small-btn">▶ Test voice</button>
+        </div>
         <h3>Recording</h3>
         <label class="chk"><input type="checkbox" id="set-gps"> Record GPS position of this phone/PC by default</label>
         <label>Quick event markers (comma-separated)<input id="set-quick" type="text"></label>

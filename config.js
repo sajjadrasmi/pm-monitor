@@ -14,7 +14,7 @@ export const firebaseConfig = {
 
 export const APP = {
   title: 'PM Monitor — INAIL & Sapienza',
-  version: '2.2.0',
+  version: '2.3.0',
   chunkSize: 60,        // readings per cloud chunk (60 = one chunk per minute per box)
   chartPoints: 300,     // points kept on the live charts (~5 min at 1 Hz)
 };
