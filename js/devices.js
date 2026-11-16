@@ -9,6 +9,12 @@ const NUS_TX = '6e400003-b5a3-f393-e0a9-e50e24dcca9e'; // box -> app (notify)
 export const HAS_BLE = typeof navigator !== 'undefined' && 'bluetooth' in navigator;
 export const HAS_SERIAL = typeof navigator !== 'undefined' && 'serial' in navigator;
 
+const PHONE_FIX_HELP = 'This phone refuses the Bluetooth data subscription (GATT operation not permitted). Fix it on THIS phone: ' +
+  '1) Close any other app that uses the box (old PM SENSORE app, nRF Connect…) and other tabs with this page. ' +
+  '2) Android Settings → Bluetooth: if PM-BOX… or XIAO… is in "Paired devices", tap ⚙ → Forget / Unpair (do NOT pair it there). ' +
+  '3) Turn Bluetooth OFF and ON again. ' +
+  '4) Chrome → ⋮ → Settings → Site settings → All sites → sajjadrasmi.github.io → Clear & reset, then allow Bluetooth / Nearby devices. ' +
+  '5) Reload this page and press Connect Bluetooth again. If it still fails, restart the phone and the box.';
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 let nextId = 1;
 
@@ -143,8 +149,25 @@ export class DeviceManager extends EventTarget {
     }
     tx.removeEventListener('characteristicvaluechanged', dev._onNotify);
     tx.addEventListener('characteristicvaluechanged', dev._onNotify);
-    await tx.startNotifications();
+    // Some Android phones refuse the first subscription right after connecting
+    // ("GATT operation not permitted" / "GATT operation failed") -> wait and retry on the same link.
+    let lastErr = null;
+    for (const wait of [400, 900, 1800, 3000]) {
+      await sleep(wait);
+      if (!server.connected) break;
+      try { await tx.startNotifications(); lastErr = null; break; }
+      catch (e) { lastErr = e; this.log(dev, 'warn', `Subscribe failed (${e.message}) — retrying…`); }
+    }
+    if (lastErr) {
+      dev._notPermitted = (dev._notPermitted || 0) + (/not permitted|NotSupported|NotAllowed/i.test(lastErr.name + ' ' + lastErr.message) ? 1 : 0);
+      try { server.disconnect(); } catch (_) {}
+      if (dev._notPermitted >= 2) {
+        throw Object.assign(new Error(PHONE_FIX_HELP), { fatal: true });
+      }
+      throw lastErr;
+    }
     dev.txChar = tx;
+    dev._notPermitted = 0;
     this._setState(dev, 'connected');
     this.log(dev, 'ok', 'Bluetooth connected, waiting for data…');
     this._send(dev, 'ID\n');
