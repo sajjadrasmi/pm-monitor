@@ -1,4 +1,4 @@
-const C='pm-3.0.0',F=['./','index.html','s.css','a.js','firebase.js','chart.umd.js','manifest.webmanifest','icon-192.png','icon-512.png'],X='https://cdn.jsdelivr.net/';
+const C='pm-3.1.0',F=['./','index.html','s.css','a.js','firebase.js','chart.umd.js','manifest.webmanifest','icon-192.png','icon-512.png'],X='https://cdn.jsdelivr.net/';
 self.addEventListener('install',e=>e.waitUntil(caches.open(C).then(c=>c.addAll(F)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==C).map(x=>caches.delete(x)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch',e=>{const u=new URL(e.request.url);if(e.request.method!=='GET')return;

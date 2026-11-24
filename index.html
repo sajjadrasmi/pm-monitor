@@ -7,6 +7,7 @@
 <meta name="description" content="Private particulate-matter monitor">
 <meta name="robots" content="noindex, nofollow">
 <meta name="theme-color" content="#0e1424">
+<script>try{var b=JSON.parse(localStorage.getItem('pm_settings')||'{}').bg;if(/^#[0-9a-f]{6}$/i.test(b))document.documentElement.style.background=b}catch(e){}</script>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
@@ -169,6 +170,13 @@ who must approve it before you can use the sensors.</p>
 <div id="view-settings" class="view" hidden>
 <div class="toolbar"><h2>Settings</h2><span class="spacer"></span><span class="small muted">PM Monitor <span id="app-version"></span></span></div>
 <form id="settings-form" class="panel settings">
+<h3>Background colour</h3>
+<p class="small muted">Choose the colour of the app background. Panels and text adjust automatically. Saved on this phone/PC.</p>
+<div class="swatches" id="set-bg-swatches"></div>
+<div class="row-inline">
+<label class="bg-custom">Any other colour <input type="color" id="set-bg-custom" value="#0e1424"></label>
+<button type="button" id="set-bg-reset" class="btn small-btn">Reset</button>
+</div>
 <h3>Alarm thresholds (µg/m³)</h3>
 <p class="small muted">Used for alarms, "time above limit" and reports. They are your working thresholds, not legal limits
 (reference: EU daily limit PM10 = 50; WHO 2021 24-h guideline PM2.5 = 15, PM10 = 45).</p>
